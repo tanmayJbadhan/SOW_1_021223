@@ -2,15 +2,16 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from typing import List, Tuple
 from tqdm import tqdm
+import numpy as np
 
 
 class ModelTrainer:
     def __init__(self, 
                 model : torch.nn.Module,
-                lr : float = 1e-3,
-                weight_decay : float = 1e-5,
+                lr : float = 1e-4,
+                weight_decay : float = 0,
                 device :str = 'cuda'
-                ) -> None:
+                ):
         self.model = model
         self.device = device
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -37,6 +38,8 @@ class ModelTrainer:
     def test(self, dataloader : DataLoader):
         loss_sum = 0
         correct = 0
+        n = 0
+        ys = np.array()
         self.model.eval()
 
         with torch.no_grad():
@@ -48,11 +51,13 @@ class ModelTrainer:
                 loss = self.criterion(y_hat, y)            
                 loss_sum += loss.cpu().item()
 
+                y_hat = y_hat.argmax(1)
                 correct += (y_hat == y).sum().cpu().item()
+                ys = np.append(ys, y_hat.numpy(force=True))
+                n += y.shape[0]
 
-
-        accuracy = correct / len(dataloader)
-        return loss_sum, accuracy
+        accuracy = correct / n
+        return loss_sum, accuracy, ys
 
 
     def train(self, trainset : DataLoader, valset : DataLoader, epoches : int) -> List[Tuple[int, float, float]]:
@@ -65,7 +70,7 @@ class ModelTrainer:
 
         for e in tqdm(range(epoches)):
             train_loss  = self.train_loop(trainset)
-            val_loss, val_acc = self.test(valset)
+            val_loss, val_acc, _ = self.test(valset)
 
             history.append((e, train_loss, val_loss, val_acc))
 
