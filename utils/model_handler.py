@@ -2,7 +2,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from copy import deepcopy
-from utils import ModelTrainer, WatermarkDataset
+from .model_trainer import ModelTrainer
+from .watermark_dataset import WatermarkDataset
 import numpy as np
 from torchvision.transforms import Compose
 from typing import Callable

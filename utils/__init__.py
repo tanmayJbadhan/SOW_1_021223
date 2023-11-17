@@ -1,3 +1,3 @@
-from .ModelHandler import ModelHandler
-from .ModelTrainer import ModelTrainer
-from .WatermarkDataset import WatermarkDataset
+from .model_handler import ModelHandler
+from .model_trainer import ModelTrainer
+from .watermark_dataset import WatermarkDataset
