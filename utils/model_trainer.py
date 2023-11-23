@@ -9,13 +9,19 @@ class ModelTrainer:
     def __init__(self, 
                 model : torch.nn.Module,
                 lr : float = 1e-4,
-                weight_decay : float = 0,
+                weight_decay : float = 2e-4,
                 device :str = 'cuda'
                 ):
         self.model = model
         self.device = device
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.optimizer = torch.optim.SGD(self.model.parameters(),
+                                         lr=lr, 
+                                         momentum=0.9, 
+                                         dampening=0, 
+                                         nesterov=True, 
+                                         weight_decay=weight_decay)
 
     def train_loop(self, trainset : DataLoader):
         loss_sum = 0
@@ -35,18 +41,18 @@ class ModelTrainer:
 
         return loss_sum
     
-    def test(self, dataloader : DataLoader):
+    def test(self, model: torch.nn.Module, dataloader : DataLoader):
         loss_sum = 0
         correct = 0
         n = 0
-        ys = np.array()
-        self.model.eval()
+        ys = np.array([])
+        model.eval()
 
         with torch.no_grad():
             for X,y in dataloader:
                 X,y = X.to(self.device), y.to(self.device)
 
-                y_hat = self.model(X)
+                y_hat = model(X)
 
                 loss = self.criterion(y_hat, y)            
                 loss_sum += loss.cpu().item()
@@ -60,7 +66,7 @@ class ModelTrainer:
         return loss_sum, accuracy, ys
 
 
-    def train(self, trainset : DataLoader, valset : DataLoader, epoches : int) -> List[Tuple[int, float, float]]:
+    def train(self, trainset : DataLoader, valset : DataLoader = None, epoches : int=2) -> List[Tuple[int, float, float]]:
         """
             Trains a model and computes the loss for each epoch.
             Returns a list of tuples for which we have
@@ -70,9 +76,12 @@ class ModelTrainer:
 
         for e in tqdm(range(epoches)):
             train_loss  = self.train_loop(trainset)
-            val_loss, val_acc, _ = self.test(valset)
 
-            history.append((e, train_loss, val_loss, val_acc))
+            if valset is not None:
+                val_loss, val_acc, _ = self.test(self.model, valset)
+                history.append((e, train_loss, val_loss, val_acc))
+            else:
+                history.append((e, train_loss))
 
         return history
 
