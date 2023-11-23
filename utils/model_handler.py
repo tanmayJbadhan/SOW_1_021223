@@ -28,18 +28,17 @@ class ModelHandler:
         model = deepcopy(self.model)
         trainer = ModelTrainer(model, device=self.device)
         history = trainer.train(trainset, valset, epochs)
-
+        print(history)
         return trainer.model
     
     def evaluate(self, pattern_func:Callable[[np.array], np.array]):
         wm_data = WatermarkDataset(self.dataset, watermark_func=pattern_func, transform=self.transform)
 
-        splits = torch.utils.data.random_split(wm_data,lengths=[0.999, 0.001])
-        trainset, valset = list(map(ModelHandler.to_dataloader, splits))
+        trainset = ModelHandler.to_dataloader(wm_data)
 
         wm_model = self.finetune(trainset)
         
-        return self.metrics(wm_model, pattern_func=pattern_func)
+        return wm_model, self.metrics(wm_model, pattern_func=pattern_func)
     
     def finetune_attack(self, model:nn.Module, pattern_func, epoches: int = 2):
         override_dataset = WatermarkDataset(self.testset, watermark_func=lambda x: x, transform=self.transform).get_clean_dataset()
@@ -49,7 +48,7 @@ class ModelHandler:
         trainer.train(overrideset, epoches=epoches)
         attacked_model = trainer.model
 
-        return self.metrics(attacked_model, pattern_func=pattern_func)
+        return attacked_model, self.metrics(attacked_model, pattern_func=pattern_func)
 
         
     def metrics(self, model: nn.Module, pattern_func):
@@ -67,7 +66,7 @@ class ModelHandler:
         #######
         # INSERT HERE ANY EVALUATION METRIC
         #TANMAY CODE
-        pass
+        return clean_accuracy, wm_accuracy, fpr
         
 
         
