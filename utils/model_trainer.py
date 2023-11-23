@@ -9,7 +9,7 @@ class ModelTrainer:
     def __init__(self, 
                 model : torch.nn.Module,
                 lr : float = 1e-4,
-                weight_decay : float = 2e-4,
+                weight_decay : float = 1e-4,
                 device :str = 'cuda'
                 ):
         self.model = model

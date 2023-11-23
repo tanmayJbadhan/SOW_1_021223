@@ -17,7 +17,7 @@ class WatermarkDataset(Dataset):
             ) -> None:
         super().__init__()
         self.watermark_func = watermark_func
-        self.watermark_size = watermark_size if watermark_size is not None else len(dataset)
+        self.watermark_size = watermark_size if watermark_size is not None else len(dataset) // 5
         self.dataset = dataset
         self.transform = transform if transform is not None else Compose([])
         self.inv_transform = inv_transform
