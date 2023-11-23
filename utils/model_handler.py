@@ -23,37 +23,52 @@ class ModelHandler:
         self.transform = transform
         self.model.to(device)
         
-    def finetune(self, trainset: DataLoader, valset: DataLoader, epochs:int=2):
+    def finetune(self, trainset: DataLoader, valset: DataLoader = None, epochs:int=2):
         """Finetunes a model on the given Dataset and then returns it"""
         model = deepcopy(self.model)
         trainer = ModelTrainer(model, device=self.device)
         history = trainer.train(trainset, valset, epochs)
 
-        return trainer, history
+        return trainer.model
     
     def evaluate(self, pattern_func:Callable[[np.array], np.array]):
         wm_data = WatermarkDataset(self.dataset, watermark_func=pattern_func, transform=self.transform)
-        wm_test = WatermarkDataset(self.testset, watermark_func=pattern_func, transform=self.transform)
 
-        splits = torch.utils.data.random_split(wm_data,lengths=[0.9, 0.1])
+        splits = torch.utils.data.random_split(wm_data,lengths=[0.999, 0.001])
         trainset, valset = list(map(ModelHandler.to_dataloader, splits))
 
+        wm_model = self.finetune(trainset)
+        
+        return self.metrics(wm_model, pattern_func=pattern_func)
+    
+    def finetune_attack(self, model:nn.Module, pattern_func, epoches: int = 2):
+        override_dataset = WatermarkDataset(self.testset, watermark_func=lambda x: x, transform=self.transform).get_clean_dataset()
+        overrideset = ModelHandler.to_dataloader(override_dataset)
+
+        trainer = ModelTrainer(deepcopy(model), device=self.device)
+        trainer.train(overrideset, epoches=epoches)
+        attacked_model = trainer.model
+
+        return self.metrics(attacked_model, pattern_func=pattern_func)
+
+        
+    def metrics(self, model: nn.Module, pattern_func):
+        trainer = ModelTrainer(model)
+        # Evaluation
+        wm_test = WatermarkDataset(self.testset, watermark_func=pattern_func, transform=self.transform)
         clean_testset = ModelHandler.to_dataloader(wm_test.get_clean_dataset())
         wm_testset    = ModelHandler.to_dataloader(wm_test.get_watermarked_dataset())
 
-        wm_trainer, history = self.finetune(trainset, valset)
-        wm_model = wm_trainer.model
-
-        # Evaluation
-        _, clean_accuracy, clean_ys = wm_trainer.test(clean_testset)
-        _, wm_accuracy,    wm_ys    = wm_trainer.test(wm_testset)
+        _, clean_accuracy, clean_ys = trainer.test(model, clean_testset)
+        _, wm_accuracy,    wm_ys    = trainer.test(model, wm_testset)
 
         fpr = (clean_ys==WatermarkDataset.TRIGGER_TARGET).mean()
 
         #######
         # INSERT HERE ANY EVALUATION METRIC
+        #TANMAY CODE
+        pass
         
-        return clean_accuracy, wm_accuracy, fpr
 
         
     @staticmethod
@@ -68,4 +83,4 @@ class ModelHandler:
         return ModelHandler(model, dataset, testset, transform=transform, device=device)
 
 
-# ModelHandler.download_model("chenyaofo/pytorch-cifar-models", 'cifar10_vgg11_bn')
+# ModelHandler.download_model("chenyaofo/pytorch-cifar-models", 'cifar10_resnet20')
