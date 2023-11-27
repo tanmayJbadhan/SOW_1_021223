@@ -13,11 +13,13 @@ class ModelHandler:
             model : torch.nn.Module,
             dataset : Dataset,
             testset : Dataset,
+            pirate_set : Dataset,
             transform : Compose = None,
             device : str = 'cuda',
         ) -> None:
         self.dataset = dataset
         self.testset = testset
+        self.pirate_set = pirate_set
         self.model = model
         self.device = device
         self.transform = transform
@@ -41,7 +43,7 @@ class ModelHandler:
         return wm_model, self.metrics(wm_model, pattern_func=pattern_func)
     
     def finetune_attack(self, model:nn.Module, pattern_func, epoches: int = 2):
-        override_dataset = WatermarkDataset(self.testset, watermark_func=lambda x: x, transform=self.transform).get_clean_dataset()
+        override_dataset = WatermarkDataset(self.pirate_set, watermark_func=lambda x: x, transform=self.transform).get_clean_dataset()
         overrideset = ModelHandler.to_dataloader(override_dataset)
 
         trainer = ModelTrainer(deepcopy(model), device=self.device)
