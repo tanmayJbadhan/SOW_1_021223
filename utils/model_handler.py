@@ -68,7 +68,7 @@ class ModelHandler:
         #######
         # INSERT HERE ANY EVALUATION METRIC
         #TANMAY CODE
-        return clean_accuracy, wm_accuracy, fpr
+        return clean_accuracy + wm_accuracy + fpr
         
 
         

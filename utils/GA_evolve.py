@@ -5,9 +5,9 @@ from typing import List, Tuple
 #import wh.evaluate
 
 DIFFERENTIAL_WEIGHT = 0.7 # Arbitrary value for testing
-KEY_LENGTH = 50 # Id
-NUMBER_OF_GENERATION = 100 # Id
-POPULATION_SIZE = 100 # Id
+KEY_LENGTH = 10 # Id
+NUMBER_OF_GENERATION = 3 # Id
+POPULATION_SIZE = 20 # Id
 WIDTH, HEIGHT = 32, 32 # Image size
 
 F, K, G, N, W, H = DIFFERENTIAL_WEIGHT, NUMBER_OF_GENERATION, POPULATION_SIZE, KEY_LENGTH, WIDTH, HEIGHT # Aliases
@@ -80,7 +80,7 @@ def generate_population(N: int, max_width: int, max_height: int) -> List[logo]:
         for _ in range(N)
     ]
 
-def differential_evolution_logo(D, f0, N:int=N, G:int=G, max_cx:int, max_cy:int, F:float=F, LOGGING:bool=LOGGING):
+def differential_evolution_logo(D, f0, N:int=N, G:int=G, max_cx:int=10, max_cy:int=10, F:float=F, LOGGING:bool=LOGGING):
     # Randomly initialize population
     population = generate_population(N, max_cy, max_cx)
     fitness_scores = [evaluate_logo(l, f0, D) for l in population]
@@ -115,6 +115,7 @@ def differential_evolution_logo(D, f0, N:int=N, G:int=G, max_cx:int, max_cy:int,
         # Log best candidate and its fitness
         if LOGGING:
             log.append([best_key, best_fitness])
+            print(best_key, best_fitness)
     # Return the best candidate after G generations
     if LOGGING:
         return log
@@ -169,20 +170,47 @@ def evolve_key(C1: key, C2: key, C3: key, F: float, K: int = K, W: int = W, H: i
 
 def watermarked_key(img, k:key):
     # Depends heavily on the structure of img
-    print("placeholder watermarking")
+    # print("placeholder watermarking")
     for pixel in k:
         R,G,B,x,y = pixel
-        img[x,y] += (R,G,B)
+        img[x,y] += np.ndarray([R,G,B])
         img[x,y] = np.clip(img[x,y], [0,0,0], [255,255,255])
     return img
 
 
+import torchvision
+import torch
+from torchvision import transforms
+
+train_dataset = torchvision.datasets.CIFAR10(
+    root= './data', train = True,
+    download =True, transform = None)
+test_dataset  = torchvision.datasets.CIFAR10(
+    root= './data', train = False,
+    download =True, transform = None)
+torch.manual_seed(1789)
+_, pirate_dataset = torch.utils.data.random_split(train_dataset, [0.8, 0.2])
+from .model_handler import ModelHandler
+chenyaofo_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+])
+
+mh = ModelHandler.download_model(
+    "chenyaofo/pytorch-cifar-models", 'cifar10_resnet20',
+    dataset = train_dataset,
+    pirate_set = pirate_dataset,
+    testset = test_dataset,
+    transform = chenyaofo_transform,
+    # device = 'cpu'
+)
+
 def evaluate_key(k:key, f, dataset): # passing f and the dataset might not be necessary
-    print("placeholder evaluate function")
-    # def watermarking_function(img):
-        # return watermarked_key(img, k)
-    # return mh.evaluate(watermarking_function)
-    return 1.
+    # print("placeholder evaluate function")
+    def watermarking_function(img):
+        return watermarked_key(img, k)
+    return mh.evaluate(watermarking_function)[1]
+
 def f0(img): 
     print("placeholder model")
     tag = np.random.randint(10)
