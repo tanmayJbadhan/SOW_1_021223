@@ -5,12 +5,12 @@ from typing import List, Tuple
 #import wh.evaluate
 
 DIFFERENTIAL_WEIGHT = 0.7 # Arbitrary value for testing
-KEY_LENGTH = 10 # Id
-NUMBER_OF_GENERATION = 3 # Id
-POPULATION_SIZE = 20 # Id
+KEY_LENGTH = 100 # Id
+NUMBER_OF_GENERATION = 2 # Id
+POPULATION_SIZE = 5 # Id
 WIDTH, HEIGHT = 32, 32 # Image size
 
-F, K, G, N, W, H = DIFFERENTIAL_WEIGHT, NUMBER_OF_GENERATION, POPULATION_SIZE, KEY_LENGTH, WIDTH, HEIGHT # Aliases
+F, K, G, N, W, H = DIFFERENTIAL_WEIGHT, KEY_LENGTH, NUMBER_OF_GENERATION, POPULATION_SIZE, WIDTH, HEIGHT # Aliases
 TESTING = True
 LOGGING = True
 
@@ -171,9 +171,11 @@ def evolve_key(C1: key, C2: key, C3: key, F: float, K: int = K, W: int = W, H: i
 def watermarked_key(img, k:key):
     # Depends heavily on the structure of img
     # print("placeholder watermarking")
+    # print(img)
     for pixel in k:
+        # print(pixel)
         R,G,B,x,y = pixel
-        img[x,y] += np.ndarray([R,G,B])
+        img[x,y] += np.array([R,G,B], dtype=np.uint8)
         img[x,y] = np.clip(img[x,y], [0,0,0], [255,255,255])
     return img
 
@@ -189,6 +191,7 @@ test_dataset  = torchvision.datasets.CIFAR10(
     root= './data', train = False,
     download =True, transform = None)
 torch.manual_seed(1789)
+train_dataset, _ = torch.utils.data.random_split(train_dataset, [0.01, 0.99])
 _, pirate_dataset = torch.utils.data.random_split(train_dataset, [0.8, 0.2])
 from .model_handler import ModelHandler
 chenyaofo_transform = transforms.Compose([
@@ -230,7 +233,7 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
         log.append([best_key, best_fitness])
 
     # Iterate over G generations
-    for _ in range(G - 1): # Already did one generation at random initialization
+    for gen in range(G - 1): # Already did one generation at random initialization
         for i in range(N):
             candidates = list(range(N))
             j, k, l = np.random.choice(candidates, 3, replace=False)
@@ -251,6 +254,7 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
         # Log best candidate and its fitness
         if LOGGING:
             log.append([best_key, best_fitness])
+            print(f'{gen}: best_key=',best_key,'fitness=', best_fitness)
     # Return the best candidate after G generations
     if LOGGING:
         return log
