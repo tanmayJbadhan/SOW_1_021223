@@ -30,7 +30,7 @@ class ModelHandler:
         model = deepcopy(self.model)
         trainer = ModelTrainer(model, device=self.device)
         history = trainer.train(trainset, valset, epochs)
-        print(history)
+        #print(history)
         return trainer.model
     
     def evaluate(self, pattern_func:Callable[[np.array], np.array]):
@@ -79,9 +79,10 @@ class ModelHandler:
     @staticmethod
     def download_model(repo:str, model_name:str, device:str='cuda',dataset : Dataset = None,
             testset : Dataset = None,
+            pirate_set : Dataset = None,
             transform : Compose = None):
         model = torch.hub.load(repo, model_name, pretrained=True)
-        return ModelHandler(model, dataset, testset, transform=transform, device=device)
+        return ModelHandler(model, dataset, testset, pirate_set=pirate_set, transform=transform, device=device)
 
 
 # ModelHandler.download_model("chenyaofo/pytorch-cifar-models", 'cifar10_resnet20')
