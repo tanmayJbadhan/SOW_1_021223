@@ -222,8 +222,9 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
     # Randomly initialize population
     population = [np.random.randint((256, 256, 256, W, H), size=(K, 5)) for _ in range(N)]
     fitness_scores = [evaluate_key(k, f0, D) for k in population]
-    best_key, best_fitness = max(zip(population, fitness_scores), key=lambda x: x[1])
-
+    best_key, best_evaluation = max(zip(population, fitness_scores), key=lambda x: x[1])
+    best_fitness, best_metrics = best_evaluation
+    
     new_pop = [None for _ in range(N)]
     #new_pop = [np.zeros((K, 5)) for _ in range(N)]
     new_fitness_scores = [0 for _ in range(N)]
@@ -239,13 +240,14 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
             j, k, l = np.random.choice(candidates, 3, replace=False)
             
             new_key = evolve_key(population[j], population[k], population[l], F, K)
-            new_fitness = evaluate_key(new_key, f0, D)
+            new_fitness, new_metrics = evaluate_key(new_key, f0, D)
 
             if new_fitness > fitness_scores[i]:
                 new_pop[i] = new_key
                 new_fitness_scores[i] = new_fitness
+                
                 if LOGGING and new_fitness > best_fitness:
-                    best_key, best_fitness = new_key, new_fitness
+                    best_key, best_fitness, best_metrics = new_key, new_fitness, new_metrics
             else:
                 new_pop[i] = population[i]  # Keep the old key if new one is not better
 
@@ -253,13 +255,13 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
         fitness_scores = new_fitness_scores
         # Log best candidate and its fitness
         if LOGGING:
-            log.append([best_key, best_fitness])
-            print(f'{gen}: best_key=',best_key,'fitness=', best_fitness)
+            log.append([best_key, best_fitness, best_metrics])
+            print(f'{gen}: best_key=',best_key,'fitness=', best_fitness, 'metrics=', best_metrics)
     # Return the best candidate after G generations
     if LOGGING:
         return log
     else:
-        return best_key, best_fitness
+        return best_key, best_fitness, best_metrics
 
 
 
