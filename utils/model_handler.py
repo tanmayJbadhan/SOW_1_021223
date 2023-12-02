@@ -25,22 +25,27 @@ class ModelHandler:
         self.transform = transform
         self.model.to(device)
         
-    def finetune(self, trainset: DataLoader, valset: DataLoader = None, epochs:int=2):
+    def finetune(self, pattern_func, epochs:int=2):
         """Finetunes a model on the given Dataset and then returns it"""
         model = deepcopy(self.model)
         trainer = ModelTrainer(model, device=self.device)
-        history = trainer.train(trainset, valset, epochs)
-        #print(history)
-        return trainer.model
+        wm_data = WatermarkDataset(self.dataset, watermark_func=pattern_func, transform=self.transform, change_label=True)
+        wm_set = ModelHandler.to_dataloader(wm_data)
+
+        history = trainer.train(wm_set, None, epochs)
+
+        return trainer.model, self.metrics(trainer.model, pattern_func)
+
     
     def evaluate(self, pattern_func:Callable[[np.array], np.array]):
-        wm_data = WatermarkDataset(self.dataset, watermark_func=pattern_func, transform=self.transform)
+        wm_data = WatermarkDataset(self.testset, watermark_func=pattern_func, transform=self.transform, change_label=False)
 
-        trainset = ModelHandler.to_dataloader(wm_data)
 
-        wm_model = self.finetune(trainset)
+        wm_set = ModelHandler.to_dataloader(wm_data.get_watermarked_dataset())
+        trainer = ModelTrainer(self.model, device=self.device)
+
         
-        return wm_model, self.metrics(wm_model, pattern_func=pattern_func)
+        return trainer.test(self.model, wm_set)[1]
     
     def finetune_attack(self, model:nn.Module, pattern_func, epoches: int = 2):
         override_dataset = WatermarkDataset(self.pirate_set, watermark_func=lambda x: x, transform=self.transform).get_clean_dataset()
@@ -68,7 +73,7 @@ class ModelHandler:
         #######
         # INSERT HERE ANY EVALUATION METRIC
         #TANMAY CODE
-        return clean_accuracy + wm_accuracy + fpr
+        return clean_accuracy, wm_accuracy, fpr
         
 
         

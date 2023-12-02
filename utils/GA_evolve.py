@@ -2,13 +2,42 @@ import numpy as np
 import heapq
 
 from typing import List, Tuple
-#import wh.evaluate
+#import mh.evaluate
+import torchvision
+import torch
+from torchvision import transforms
+
+train_dataset = torchvision.datasets.CIFAR10(
+    root= './data', train = True,
+    download =True, transform = None)
+test_dataset  = torchvision.datasets.CIFAR10(
+    root= './data', train = False,
+    download =True, transform = None)
+torch.manual_seed(1789)
+train_dataset, _ = torch.utils.data.random_split(train_dataset, [0.01,0.99])
+_, pirate_dataset = torch.utils.data.random_split(train_dataset, [0.8, 0.2])
+test_dataset, _ = torch.utils.data.random_split(test_dataset, [0.5, 0.5])
+from .model_handler import ModelHandler
+chenyaofo_transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+])
+
+mh = ModelHandler.download_model(
+    "chenyaofo/pytorch-cifar-models", 'cifar10_resnet20',
+    dataset = train_dataset,
+    pirate_set = pirate_dataset,
+    testset = test_dataset,
+    transform = chenyaofo_transform,
+    # device = 'cpu'
+)
 
 DIFFERENTIAL_WEIGHT = 0.7 # Arbitrary value for testing
 KEY_LENGTH = 100 # Id
-NUMBER_OF_GENERATION = 2 # Id
-POPULATION_SIZE = 5 # Id
+NUMBER_OF_GENERATION = 50 # Id
+POPULATION_SIZE = 60 # Id
 WIDTH, HEIGHT = 32, 32 # Image size
+ALPHA = 0.1 # blending parameter for the watermark
 
 F, K, G, N, W, H = DIFFERENTIAL_WEIGHT, KEY_LENGTH, NUMBER_OF_GENERATION, POPULATION_SIZE, WIDTH, HEIGHT # Aliases
 TESTING = True
@@ -80,6 +109,10 @@ def generate_population(N: int, max_width: int, max_height: int) -> List[logo]:
         for _ in range(N)
     ]
 
+
+log = []
+
+
 def differential_evolution_logo(D, f0, N:int=N, G:int=G, max_cx:int=10, max_cy:int=10, F:float=F, LOGGING:bool=LOGGING):
     # Randomly initialize population
     population = generate_population(N, max_cy, max_cx)
@@ -90,6 +123,7 @@ def differential_evolution_logo(D, f0, N:int=N, G:int=G, max_cx:int=10, max_cy:i
     new_fitness_scores = [0 for _ in range(N)]
     # Log initial best key
     if LOGGING:
+        global log 
         log = []
         log.append([best_key, best_fitness])
 
@@ -148,6 +182,37 @@ def pair(C1: key, C2: key, K:int=K) -> dict:
     
     return pair_map
 
+def reduce_overlap(pixels, W, H):
+    # Create a 2D grid to track occupied positions
+    occupancy_grid = np.zeros((W, H), dtype=bool)
+
+    for pixel in pixels:
+        x, y = int(pixel[3]), int(pixel[4])
+        if occupancy_grid[x, y]:
+            pixel[3], pixel[4] = find_new_position(x, y, occupancy_grid, W, H)
+        occupancy_grid[int(pixel[3]), int(pixel[4])] = True
+
+    return pixels
+
+def find_new_position(x, y, occupancy_grid, W, H):
+    # Spiral search for a new position
+    dx, dy = 0, -1
+    step_size = 0
+    max_step = max(W, H)  # Maximum steps to prevent infinite loops
+
+    for _ in range(max_step**2):
+        if not (0 <= x < W and 0 <= y < H) or occupancy_grid[x, y]:
+            # The position is outside bounds or occupied, so continue searching
+            dx, dy = -dy, dx  # Change direction
+            if dy == 0:
+                step_size += 1  # Increase step size every full loop
+        else:
+            return x, y  # Found an unoccupied position
+
+        x, y = x + dx, y + dy  # Take a step
+
+    # If the loop completes without finding an unoccupied position, return the current position
+    return x, y
 
 def evolve_key(C1: key, C2: key, C3: key, F: float, K: int = K, W: int = W, H: int = H) -> key:
     pair_map_C1_C2 = pair(C1, C2, K)
@@ -160,59 +225,36 @@ def evolve_key(C1: key, C2: key, C3: key, F: float, K: int = K, W: int = W, H: i
     # Calculate the new positions using the differential weight F
     new_pixels = C1 + F * (C2_paired - C3_paired)
 
+    #overlapping_pixels = (C2_paired[:,3:] == C3_paired[:,3:]).sum(axis=-1) ==2 
+    #new_pixels[overlapping_pixels, 3] = np.random.randint(0,H, size=overlapping_pixels.sum())
+    #new_pixels[overlapping_pixels, 4] = np.random.randint(0,W, size=overlapping_pixels.sum())
 
     # For pixel values, the range is 0 to 255, for coordinates, it's 0 to W-1 or H-1 respectively
     new_pixels = np.clip(new_pixels, [0,0,0, 0, 0], [255,255,255, W - 1, H - 1])
+    new_pixels = reduce_overlap(new_pixels, W, H)
+
     # Round and convert to appropriate data types
     new_pixels = np.rint(new_pixels).astype(int)  # Round and convert to int
 
     return new_pixels
 
-def watermarked_key(img, k:key):
+def watermarked_key(img, k:key, alpha:float=ALPHA):
     # Depends heavily on the structure of img
     # print("placeholder watermarking")
     # print(img)
     for pixel in k:
         # print(pixel)
         R,G,B,x,y = pixel
-        img[x,y] += np.array([R,G,B], dtype=np.uint8)
+        img[x,y] = img[x,y] + np.array([R,G,B], dtype=np.uint8)
         img[x,y] = np.clip(img[x,y], [0,0,0], [255,255,255])
     return img
 
-
-import torchvision
-import torch
-from torchvision import transforms
-
-train_dataset = torchvision.datasets.CIFAR10(
-    root= './data', train = True,
-    download =True, transform = None)
-test_dataset  = torchvision.datasets.CIFAR10(
-    root= './data', train = False,
-    download =True, transform = None)
-torch.manual_seed(1789)
-train_dataset, _ = torch.utils.data.random_split(train_dataset, [0.01, 0.99])
-_, pirate_dataset = torch.utils.data.random_split(train_dataset, [0.8, 0.2])
-from .model_handler import ModelHandler
-chenyaofo_transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-])
-
-mh = ModelHandler.download_model(
-    "chenyaofo/pytorch-cifar-models", 'cifar10_resnet20',
-    dataset = train_dataset,
-    pirate_set = pirate_dataset,
-    testset = test_dataset,
-    transform = chenyaofo_transform,
-    # device = 'cpu'
-)
-
 def evaluate_key(k:key, f, dataset): # passing f and the dataset might not be necessary
-    # print("placeholder evaluate function")
     def watermarking_function(img):
         return watermarked_key(img, k)
-    return mh.evaluate(watermarking_function)[1]
+    fitness =  mh.evaluate(watermarking_function)
+    #print(fitnes)
+    return fitness
 
 def f0(img): 
     print("placeholder model")
@@ -221,9 +263,16 @@ def f0(img):
 def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGGING:bool=LOGGING):
     # Randomly initialize population
     population = [np.random.randint((256, 256, 256, W, H), size=(K, 5)) for _ in range(N)]
-    fitness_scores = [evaluate_key(k, f0, D) for k in population]
+    print("first test")
+    #evaluation_scores = [evaluate_key(key_n, f0, D) for key_n in population]
+    #best_key, best_evaluation = max(zip(population, evaluation_scores), key=lambda x: x[1][0])
+    #best_fitness, best_metrics = best_evaluation
+    #fitness_scores = [e[0] for e in evaluation_scores]
+    
+    fitness_scores = [evaluate_key(key_n, f0, D) for key_n in population]
     best_key, best_fitness = max(zip(population, fitness_scores), key=lambda x: x[1])
-
+    #best_fitness, best_metrics = best_evaluation
+    #fitness_scores = [e[0] for e in evaluation_scores]
     new_pop = [None for _ in range(N)]
     #new_pop = [np.zeros((K, 5)) for _ in range(N)]
     new_fitness_scores = [0 for _ in range(N)]
@@ -231,19 +280,22 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
     if LOGGING:
         log = []
         log.append([best_key, best_fitness])
+        print('initial fitness =', best_fitness)
+
+
 
     # Iterate over G generations
-    for gen in range(G - 1): # Already did one generation at random initialization
+    for gen in range(1, G): # Already did one generation at random initialization
         for i in range(N):
             candidates = list(range(N))
             j, k, l = np.random.choice(candidates, 3, replace=False)
-            
             new_key = evolve_key(population[j], population[k], population[l], F, K)
             new_fitness = evaluate_key(new_key, f0, D)
-
+            # print(f'gen: {gen}, sample: {i}, tentative fitness: {new_fitness}')
             if new_fitness > fitness_scores[i]:
                 new_pop[i] = new_key
                 new_fitness_scores[i] = new_fitness
+                
                 if LOGGING and new_fitness > best_fitness:
                     best_key, best_fitness = new_key, new_fitness
             else:
@@ -254,17 +306,12 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
         # Log best candidate and its fitness
         if LOGGING:
             log.append([best_key, best_fitness])
-            print(f'{gen}: best_key=',best_key,'fitness=', best_fitness)
+            print(f'{gen}: fitness=', best_fitness)
     # Return the best candidate after G generations
     if LOGGING:
         return log
     else:
         return best_key, best_fitness
-
-
-
-
-
 
 
 
@@ -324,12 +371,20 @@ def test_evolve_key():
     assert np.allclose(actual_new_key, expected_new_key, 1), f"Expected new key {expected_new_key} does not match actual new key {actual_new_key}"
     print("test_evolve_key() passed successfully.")
 
+def testdifferentialevolution():
+    log1=differential_evolution_key(None, None)
+    print(log1)
+
+
 def all_test():
     test_pair()
     test_pair2()
     test_evolve_key()
+    testdifferentialevolution()
     print("All tests completed.")
 
+print("JJJ")
 if __name__ == '__main__':
     if TESTING:
         all_test()
+        print("JJJ")

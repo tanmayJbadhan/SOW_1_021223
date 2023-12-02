@@ -14,13 +14,15 @@ class WatermarkDataset(Dataset):
             watermark_size : int = None,
             transform : Compose = None,
             inv_transform : Compose = None,
+            change_label : bool = True
             ) -> None:
         super().__init__()
         self.watermark_func = watermark_func
-        self.watermark_size = watermark_size if watermark_size is not None else len(dataset) // 3
+        self.watermark_size = watermark_size if watermark_size is not None else len(dataset)
         self.dataset = dataset
         self.transform = transform if transform is not None else Compose([])
         self.inv_transform = inv_transform
+        self.change_label = change_label
 
         self.watermark_transform = Compose([
             np.array,
@@ -35,20 +37,25 @@ class WatermarkDataset(Dataset):
         if index < len(self.dataset):
             return self.dataset[index]
         
-        X,_ = self.dataset[index % len(self.dataset)]
+        X,y = self.dataset[index % len(self.dataset)]
         watermarked = self.watermark_transform(X)
 
-        return watermarked, WatermarkDataset.TRIGGER_TARGET
+        if self.change_label:
+            return watermarked, WatermarkDataset.TRIGGER_TARGET
+        else:
+            return watermarked, y
     
     def __getitem__(self, index : int) -> Tuple[torch.Tensor, torch.Tensor]:
         X,y = self.getimage(index)
         return self.transform(X), torch.tensor(y)
+
 
     def get_watermarked_dataset(self) -> List[Tuple[torch.Tensor, torch.Tensor]]:
         '''Method to get the list of all watermarked samples'''
         return [self[i]
                 for i in range(len(self.dataset), len(self)) 
                 if self.dataset[i%len(self.dataset)][1] != WatermarkDataset.TRIGGER_TARGET]
+    
 
     def get_clean_dataset(self) -> List[Tuple[torch.Tensor, torch.Tensor]]:
         '''Method to get the list of all the untouched samples'''
