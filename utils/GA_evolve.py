@@ -263,6 +263,7 @@ def f0(img):
 def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGGING:bool=LOGGING):
     # Randomly initialize population
     population = [np.random.randint((256, 256, 256, W, H), size=(K, 5)) for _ in range(N)]
+<<<<<<< HEAD
     print("first test")
     #evaluation_scores = [evaluate_key(key_n, f0, D) for key_n in population]
     #best_key, best_evaluation = max(zip(population, evaluation_scores), key=lambda x: x[1][0])
@@ -273,6 +274,12 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
     best_key, best_fitness = max(zip(population, fitness_scores), key=lambda x: x[1])
     #best_fitness, best_metrics = best_evaluation
     #fitness_scores = [e[0] for e in evaluation_scores]
+=======
+    fitness_scores = [evaluate_key(k, f0, D) for k in population]
+    best_key, best_evaluation = max(zip(population, fitness_scores), key=lambda x: x[1])
+    best_fitness, best_metrics = best_evaluation
+    
+>>>>>>> 4c71a610e8684928b83814041f744288082f27f1
     new_pop = [None for _ in range(N)]
     #new_pop = [np.zeros((K, 5)) for _ in range(N)]
     new_fitness_scores = [0 for _ in range(N)]
@@ -290,14 +297,19 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
             candidates = list(range(N))
             j, k, l = np.random.choice(candidates, 3, replace=False)
             new_key = evolve_key(population[j], population[k], population[l], F, K)
+<<<<<<< HEAD
             new_fitness = evaluate_key(new_key, f0, D)
             # print(f'gen: {gen}, sample: {i}, tentative fitness: {new_fitness}')
+=======
+            new_fitness, new_metrics = evaluate_key(new_key, f0, D)
+
+>>>>>>> 4c71a610e8684928b83814041f744288082f27f1
             if new_fitness > fitness_scores[i]:
                 new_pop[i] = new_key
                 new_fitness_scores[i] = new_fitness
                 
                 if LOGGING and new_fitness > best_fitness:
-                    best_key, best_fitness = new_key, new_fitness
+                    best_key, best_fitness, best_metrics = new_key, new_fitness, new_metrics
             else:
                 new_pop[i] = population[i]  # Keep the old key if new one is not better
 
@@ -305,13 +317,18 @@ def differential_evolution_key(D, f0, N:int=N, G:int=G, K:int=K, F:float=F, LOGG
         fitness_scores = new_fitness_scores
         # Log best candidate and its fitness
         if LOGGING:
+<<<<<<< HEAD
             log.append([best_key, best_fitness])
             print(f'{gen}: fitness=', best_fitness)
+=======
+            log.append([best_key, best_fitness, best_metrics])
+            print(f'{gen}: best_key=',best_key,'fitness=', best_fitness, 'metrics=', best_metrics)
+>>>>>>> 4c71a610e8684928b83814041f744288082f27f1
     # Return the best candidate after G generations
     if LOGGING:
         return log
     else:
-        return best_key, best_fitness
+        return best_key, best_fitness, best_metrics
 
 
 
@@ -387,4 +404,7 @@ print("JJJ")
 if __name__ == '__main__':
     if TESTING:
         all_test()
+<<<<<<< HEAD
         print("JJJ")
+=======
+>>>>>>> 4c71a610e8684928b83814041f744288082f27f1
